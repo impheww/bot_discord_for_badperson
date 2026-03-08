@@ -24,10 +24,16 @@ warnings = {}
 
 # ลิงก์ต้องห้าม
 blocked_links = [
+    "https://",
+    "http://",
     "discord.gg/",
     "discord.com/invite",
+    "discordapp.com/invite",
     "t.me",
-    "line.me"
+    "line.me",
+    "is.gd",
+    "bit.ly",
+    "tinyurl.com"
 ]
 
 # ========================
@@ -319,5 +325,6 @@ async def clearwarn(ctx, member: discord.Member):
 # ================= RUN =================
 
 server_on()
+
 
 bot.run(os.getenv('TOKEN'))
