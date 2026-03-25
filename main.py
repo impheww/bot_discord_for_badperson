@@ -116,6 +116,17 @@ async def on_message(message):
     if message.author.bot:
         return
 
+    # ✅ ใส่ตรงนี้เลย
+    if message.author.guild_permissions.administrator:
+        await bot.process_commands(message)
+        return
+
+    if any(role.id in WHITELIST_ROLE_IDS for role in message.author.roles):
+        await bot.process_commands(message)
+        return
+
+    # 👇 เริ่มกันสแปม
+
     # =========================
     # กันสแปมข้อความแพทเทิร์นเดิม
     # =========================
@@ -179,20 +190,6 @@ async def on_message(message):
         return
 
 # =========================
-# ไม่แบน/เตือน ยศที่อณุญาติ
-# =========================
-
-    # ไม่ตรวจ admin
-    if message.author.guild_permissions.administrator:
-        await bot.process_commands(message)
-        return
-
-    # ไม่ตรวจ role ที่ whitelist
-    if any(role.id in WHITELIST_ROLE_IDS for role in message.author.roles):
-        await bot.process_commands(message)
-        return
-
-# =========================
 #  ระบบกันคำหยาบหรือคำต้องห้าม
 # =========================
     def contains_bad_word(text):
@@ -234,7 +231,7 @@ async def on_message(message):
             log.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
             log.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
             log.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__พิมพ์คำต้องห้าม/คำหยาบ__***", inline=False)
-            log.add_field(name=" ", value=f"**`📜 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
+            log.add_field(name=" ", value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
 
             log.set_author(
                 name=message.author.name,
@@ -308,8 +305,6 @@ async def on_message(message):
                 return False
 
             text = text.lower()
-
-            # ลบช่องว่าง (กัน h t t p)
             no_space = text.replace(" ", "")
 
             patterns = [
@@ -326,11 +321,11 @@ async def on_message(message):
 
             return False
 
-        # content ปกติ
+        # 🔹 1. content ปกติ
         if check_text(msg.content):
             return True
 
-        # embed (สำคัญมากสำหรับ forward)
+        # 🔹 2. embed (สำคัญมาก)
         for emb in msg.embeds:
 
             if check_text(emb.title):
@@ -342,17 +337,23 @@ async def on_message(message):
             if emb.url and check_text(emb.url):
                 return True
 
+            # 🔥 เพิ่มตรงนี้
+            if emb.author and emb.author.url and check_text(emb.author.url):
+                return True
+
+            if emb.footer and check_text(emb.footer.text):
+                return True
+
             for field in emb.fields:
-                if check_text(field.value):
+                if check_text(field.name) or check_text(field.value):
                     return True
 
-        # attachment
+        # 🔹 3. attachment
         for attachment in msg.attachments:
-            if check_text(attachment.url):
+            if check_text(attachment.url) or check_text(attachment.filename):
                 return True
 
         return False
-
 # =========================
 #  ใช้ฟังก์ชันแทนของเดิม
 # =========================
@@ -387,7 +388,7 @@ async def on_message(message):
                 log.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
                 log.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
                 log.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__ส่งลิงก์ต้องห้าม__***", inline=False)
-                log.add_field(name=" ", value=f"**`📜 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
+                log.add_field(name=" ", value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
 
                 log.set_author(
                     name=message.author.name,
@@ -411,11 +412,11 @@ async def on_message(message):
 
                 await log_channel.send(embed=log)
 
+            return
         # ========================
         # แบนถ้าทำซ้ำ
         # ========================
         else:
-
             await message.guild.ban(
                 message.author,
                 reason="ส่งลิงก์ต้องห้ามซ้ำ"
@@ -457,7 +458,6 @@ async def on_message(message):
             return
 
     await bot.process_commands(message)
-
 # ========================
 # ระบบแบนโดยแอดมิน
 # ========================
