@@ -26,28 +26,6 @@ user_last_messages = {}
 link_warnings = {}
 badword_warnings = {}
 bad_words = set()
-# ลิงก์ต้องห้าม
-blocked_links = [
-    "https://",
-    "discord.gg/",
-    "discord.com/invite",
-    "discordapp.com/invite",
-    "t.me",
-    "line.me",
-    "is.gd",
-    "bit.ly",
-    "tinyurl.com",
-    "t.co",
-    "rebrand.ly",
-    "cutt.ly",
-    "shorturl.at",
-    "rb.gy",
-    "soo.gd",
-    "s.id",
-    "shope.ee",
-    "lazada.co.th",
-    ".com", ".net", ".org", ".gg", "www."
-]
 
 # ========================
 # ปุ่มรับยศ
@@ -106,7 +84,65 @@ async def sendrole(ctx):
 
     await ctx.send(embed=embed, view=RoleButton())
 
+# =========================
+# ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
+# =========================
 
+def contains_blocked_link(msg):
+
+    def check_text(text):
+        if not text:
+            return False
+
+        text = str(text).lower()
+        no_space = text.replace(" ", "")
+
+        patterns = [
+            r"https?://",
+            r"www\.",
+            r"\w+\.(com|net|org|gg|io|me|co|th|xyz|link)",
+            r"discord\.gg/\w+",
+            r"discord\.com/invite/\w+"
+        ]
+
+        for p in patterns:
+            if re.search(p, no_space):
+                return True
+
+        return False
+
+    # 🔹 content ปกติ
+    if check_text(msg.content):
+        return True
+
+    # 🔹 embed
+    for emb in msg.embeds:
+
+        if check_text(emb.title):
+            return True
+
+        if check_text(emb.description):
+            return True
+
+        if emb.url and check_text(emb.url):
+            return True
+
+        if emb.author and emb.author.url and check_text(emb.author.url):
+            return True
+
+        if emb.footer and check_text(emb.footer.text):
+            return True
+
+        for field in emb.fields:
+            if check_text(field.name) or check_text(field.value):
+                return True
+
+    # 🔹 attachment
+    for attachment in msg.attachments:
+        if check_text(attachment.url) or check_text(attachment.filename):
+            return True
+
+    return False
 # ========================
 # on_message ระบบกันลิงก์ + สแปม + คำต้องห้าม
 # ========================
@@ -296,65 +332,6 @@ async def on_message(message):
         return
 
 # =========================
-# ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
-# =========================
-    def contains_blocked_link(msg):
-
-        def check_text(text):
-            if not text:
-                return False
-
-            text = text.lower()
-            no_space = text.replace(" ", "")
-
-            patterns = [
-                r"https?://",
-                r"www\.",
-                r"\w+\.(com|net|org|gg|io|me|co|th|xyz|link)",
-                r"discord\.gg/\w+",
-                r"discord\.com/invite/\w+"
-            ]
-
-            for p in patterns:
-                if re.search(p, no_space):
-                    return True
-
-            return False
-
-        # 🔹 1. content ปกติ
-        if check_text(msg.content):
-            return True
-
-        # 🔹 2. embed (สำคัญมาก)
-        for emb in msg.embeds:
-
-            if check_text(emb.title):
-                return True
-
-            if check_text(emb.description):
-                return True
-
-            if emb.url and check_text(emb.url):
-                return True
-
-            # 🔥 เพิ่มตรงนี้
-            if emb.author and emb.author.url and check_text(emb.author.url):
-                return True
-
-            if emb.footer and check_text(emb.footer.text):
-                return True
-
-            for field in emb.fields:
-                if check_text(field.name) or check_text(field.value):
-                    return True
-
-        # 🔹 3. attachment
-        for attachment in msg.attachments:
-            if check_text(attachment.url) or check_text(attachment.filename):
-                return True
-
-        return False
-# =========================
 #  ใช้ฟังก์ชันแทนของเดิม
 # =========================
     if contains_blocked_link(message):
@@ -525,10 +502,7 @@ async def on_message_edit(_, after):
     if any(role.id in WHITELIST_ROLE_IDS for role in after.author.roles):
         return
 
-    content = after.content.lower()
-
-    if any(link in content for link in blocked_links):
-
+    if contains_blocked_link(after):
         await after.delete()
 
         await after.channel.send(
@@ -569,6 +543,23 @@ async def clearwarn(ctx, member: discord.Member):
         )
 
     await ctx.send(embed=result_embed)
+# ============ เพิ่มคำต้องห้าม =============
+@bot.command()
+async def addword(ctx, *, word):
+
+    if ctx.author.id != OWNER_ID:
+        return
+
+    word = word.lower()
+
+    if word in bad_words:
+        await ctx.send(f"มีคำนี้อยู่แล้ว: `{word}`")
+        return
+
+    bad_words.add(word)
+
+    await ctx.send(f"เพิ่มคำต้องห้าม: `{word}`")
+
 # ============ ลบคำต้องห้าม =============
 @bot.command()
 async def removeword(ctx, *, word):
