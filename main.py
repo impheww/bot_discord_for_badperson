@@ -88,7 +88,7 @@ async def sendrole(ctx):
 # ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
 # =========================
 
-def contains_blocked_link(msg):
+async def contains_blocked_link(msg):
 
     def check_text(text):
         if not text:
@@ -142,22 +142,29 @@ def contains_blocked_link(msg):
         if check_text(attachment.url) or check_text(attachment.filename):
             return True
 
-    # 🔥🔥🔥 4. FORWARD / REPLY (ตัวปัญหาจริง)
+    # 🔥 4. FORWARD / REPLY (ดึงข้อความจริง)
     if msg.reference:
         try:
-            if msg.reference.resolved:
-                ref_msg = msg.reference.resolved
+            ref = msg.reference
 
-                # เช็ค content ของข้อความต้นทาง
-                if check_text(ref_msg.content):
+            # ถ้ามี resolved ใช้เลย
+            if ref.resolved:
+                ref_msg = ref.resolved
+            else:
+                # ❗ ดึงข้อความจริงจาก Discord
+                channel = msg.channel
+                ref_msg = await channel.fetch_message(ref.message_id)
+
+            # เช็ค content
+            if check_text(ref_msg.content):
+                return True
+
+            # เช็ค embed
+            for emb in ref_msg.embeds:
+                if check_text(emb.description) or check_text(emb.title):
                     return True
 
-                # เช็ค embed ของข้อความต้นทาง
-                for emb in ref_msg.embeds:
-                    if check_text(emb.description) or check_text(emb.title):
-                        return True
-
-        except (AttributeError, discord.NotFound, discord.Forbidden):
+        except (discord.NotFound, discord.Forbidden, AttributeError):
             pass
 
     return False
@@ -352,7 +359,7 @@ async def on_message(message):
 # =========================
 #  ใช้ฟังก์ชันแทนของเดิม
 # =========================
-    if contains_blocked_link(message):
+    if await contains_blocked_link(message):
 
         await message.delete()
 
