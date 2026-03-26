@@ -100,9 +100,9 @@ def contains_blocked_link(msg):
         patterns = [
             r"https?://",
             r"www\.",
-            r"\w+\.(com|net|org|gg|io|me|co|th|xyz|link)",
-            r"discord\.gg/\w+",
-            r"discord\.com/invite/\w+"
+            r"[a-zA-Z0-9\-]+\.(com|net|org|gg|io|me|co|th|xyz|link|ly|to|be|gl)",
+            r"discord\s*\.?\s*gg/\w+",
+            r"discord\s*\.?\s*com/invite/\w+"
         ]
 
         for p in patterns:
@@ -111,11 +111,11 @@ def contains_blocked_link(msg):
 
         return False
 
-    # 🔹 content ปกติ
+    # 🔹 1. content
     if check_text(msg.content):
         return True
 
-    # 🔹 embed
+    # 🔹 2. embeds
     for emb in msg.embeds:
 
         if check_text(emb.title):
@@ -137,10 +137,28 @@ def contains_blocked_link(msg):
             if check_text(field.name) or check_text(field.value):
                 return True
 
-    # 🔹 attachment
+    # 🔹 3. attachments
     for attachment in msg.attachments:
         if check_text(attachment.url) or check_text(attachment.filename):
             return True
+
+    # 🔥🔥🔥 4. FORWARD / REPLY (ตัวปัญหาจริง)
+    if msg.reference:
+        try:
+            if msg.reference.resolved:
+                ref_msg = msg.reference.resolved
+
+                # เช็ค content ของข้อความต้นทาง
+                if check_text(ref_msg.content):
+                    return True
+
+                # เช็ค embed ของข้อความต้นทาง
+                for emb in ref_msg.embeds:
+                    if check_text(emb.description) or check_text(emb.title):
+                        return True
+
+        except (AttributeError, discord.NotFound, discord.Forbidden):
+            pass
 
     return False
 # ========================
@@ -505,10 +523,12 @@ async def on_message_edit(_, after):
     if contains_blocked_link(after):
         await after.delete()
 
-        await after.channel.send(
-            f"{after.author.mention} ห้ามแก้ข้อความเป็นลิงก์ 🚫",
-            delete_after=5
+        warn_embed = discord.Embed(
+            description="<a:warning2:1477146378491793529> คุณกระทำผิดกฎเซิร์ฟเวอร์\n```ห้ามแก้ข้อความเป็นลิงก์ 🚫```",
+            color=discord.Color.orange()
         )
+
+        await after.channel.send(after.author.mention, embed=warn_embed, delete_after=5)
 
 # ========================
 # ระบบนำ warning ออกจากผู้ใช้
