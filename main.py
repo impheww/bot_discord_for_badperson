@@ -8,11 +8,12 @@ from myserver import server_on
 # ================= TOKEN =================
 # Token อยู่ใน render
 # ================= ID CHANNEL =================
-DOT_CHANNEL_ID = 1470997086068805715 # ห้องจุดเช็คยศ
-LOG_CHANNEL_ID = 1480097222614974535 # ห้อง embed เตือน/แบน
+DOT_CHANNEL_ID = 1470997086068805715  # ห้องจุดเช็คยศ
+LOG_CHANNEL_ID = 1480097222614974535  # ห้อง embed เตือน/แบน
 # ================= ID ROLE =================
-ROLE_ID = 1479026080944885780 # ยศปุ่มรับยศ
-WHITELIST_ROLE_IDS = [1474002697077264424, 1470443370538074214, 1049290191778623549, 1474034129841553450]  # ยศที่อนุญาตให้ส่งลิงก์ได้ (เช่น Admin/Mod)
+ROLE_ID = 1479026080944885780  # ยศปุ่มรับยศ
+WHITELIST_ROLE_IDS = [1474002697077264424, 1470443370538074214, 1049290191778623549,
+                      1474034129841553450]  # ยศที่อนุญาตให้ส่งลิงก์ได้ (เช่น Admin/Mod)
 OWNER_ID = 848068744303083551
 
 intents = discord.Intents.default()
@@ -26,6 +27,7 @@ user_last_messages = {}
 link_warnings = {}
 badword_warnings = {}
 bad_words = set()
+
 
 # ========================
 # ปุ่มรับยศ
@@ -72,7 +74,6 @@ async def on_ready():
 # ========================
 @bot.command()
 async def sendrole(ctx):
-
     if ctx.author.id != OWNER_ID:
         return
 
@@ -80,16 +81,16 @@ async def sendrole(ctx):
         title="<a:1bow:1475397909301432432> อ่านกฎโซนให้เข้าใจก่อนรับยศ",
         description="```กดปุ่มอีโมจิ 🔞 ด้านล่างเพื่อรับยศ```",
         color=discord.Color.purple()
-        )
+    )
 
     await ctx.send(embed=embed, view=RoleButton())
+
 
 # =========================
 # ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
 # =========================
 
 async def contains_blocked_link(msg):
-
     def check_text(text):
         if not text:
             return False
@@ -98,11 +99,9 @@ async def contains_blocked_link(msg):
         no_space = text.replace(" ", "")
 
         patterns = [
-            r"https?://",
-            r"www\.",
-            r"[a-zA-Z0-9\-]+\.(com|net|org|gg|io|me|co|th|xyz|link|ly|to|be|gl)",
-            r"discord\s*\.?\s*gg/\w+",
-            r"discord\s*\.?\s*com/invite/\w+"
+            r"discord\s*\.?\s*gg/[a-zA-Z0-9]+",
+            r"discord\s*\.?\s*com/invite/[a-zA-Z0-9]+",
+            r"discordapp\s*\.?\s*com/invite/[a-zA-Z0-9]+"
         ]
 
         for p in patterns:
@@ -138,46 +137,19 @@ async def contains_blocked_link(msg):
                 return True
 
     # 🔹 3. attachments
-    for attachment in msg.attachments:
-        if check_text(attachment.url) or check_text(attachment.filename):
-            return True
-
-    # 🔥 4. FORWARD / REPLY (ดึงข้อความจริง)
-    if msg.reference:
-        try:
-            ref = msg.reference
-
-            # ถ้ามี resolved ใช้เลย
-            if ref.resolved:
-                ref_msg = ref.resolved
-            else:
-                # ❗ ดึงข้อความจริงจาก Discord
-                channel = msg.channel
-                ref_msg = await channel.fetch_message(ref.message_id)
-
-            # เช็ค content
-            if check_text(ref_msg.content):
-                return True
-
-            # เช็ค embed
-            for emb in ref_msg.embeds:
-                if check_text(emb.description) or check_text(emb.title):
-                    return True
-
-        except (discord.NotFound, discord.Forbidden, AttributeError):
-            pass
+    # อนุญาตให้ส่งรูปและคลิปได้
 
     return False
+
+
 # ========================
 # on_message ระบบกันลิงก์ + สแปม + คำต้องห้าม
 # ========================
 @bot.event
 async def on_message(message):
-
     if message.author.bot:
         return
 
-    # ✅ ใส่ตรงนี้เลย
     if message.author.guild_permissions.administrator:
         await bot.process_commands(message)
         return
@@ -186,55 +158,20 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # 👇 เริ่มกันสแปม
-
-    # =========================
-    # กันสแปมข้อความแพทเทิร์นเดิม
-    # =========================
-    user_id = message.author.id
-    content = message.content.strip().lower()
-
-    if user_id not in user_last_messages:
-        user_last_messages[user_id] = []
-
-    user_last_messages[user_id].append((content, message))
-
-    # เก็บแค่ 2 ล่าสุด
-    if len(user_last_messages[user_id]) > 2:
-        user_last_messages[user_id].pop(0)
-
-    # เช็คว่าทั้ง 2 เหมือนกันมั้ย
-    if len(user_last_messages[user_id]) == 2:
-        msgs = user_last_messages[user_id]
-
-        if all(m[0] == content for m in msgs):
-            for _, msg_obj in msgs:
-                try:
-                    await msg_obj.delete()
-                except discord.NotFound:
-                    pass
-                except discord.Forbidden:
-                    pass
-
-            user_last_messages[user_id] = []
-
-            await message.channel.send(
-                f"{message.author.mention}",
-                embed=discord.Embed(
-                    description="<a:warning2:1477146378491793529> คุณกระทำผิดกฎเซิร์ฟเวอร์\n```ห้ามสแปมข้อความซ้ำ 🚫```",
-                    color=discord.Color.orange()
-                ),
-                delete_after=5
-            )
-            return
-# =========================
-# ห้องพิมพ์ได้แค่ "."
-# =========================
+        # =========================
+        # DOT ห้องพิมพ์ได้แค่ "."
+        # =========================
 
     if message.channel.id == DOT_CHANNEL_ID:
 
         # ถ้าไม่ใช่ "."
-        if message.content.strip() != "." or message.mentions or message.stickers:
+        if (
+                message.content.strip() != "."
+                or message.mentions
+                or message.stickers
+                or message.attachments
+                or message.embeds
+        ):
             await message.delete()
 
             warn_embed = discord.Embed(
@@ -248,117 +185,12 @@ async def on_message(message):
                 delete_after=5
             )
 
-        return
-
-# =========================
-#  ระบบกันคำหยาบหรือคำต้องห้าม
-# =========================
-    def contains_bad_word(text):
-        if not text:
-            return False
-
-        text = text.lower()
-
-        for word in bad_words:
-            if word in text:
-                return True
-
-        return False
-
-    if contains_bad_word(message.content):
-
-        await message.delete()
-
-        user_id = message.author.id
-
-        if user_id not in badword_warnings:
-            badword_warnings[user_id] = 1
-
-            warn_embed = discord.Embed(
-                description="<a:warning2:1477146378491793529> คุณกระทำผิดกฎเซิร์ฟเวอร์\n```พิมพ์คำต้องห้ามหรือคำหยาบ```",
-                color=discord.Color.orange()
-            )
-
-            await message.channel.send(message.author.mention, embed=warn_embed, delete_after=5)
-
-        log_channel = bot.get_channel(LOG_CHANNEL_ID)
-
-        if log_channel:
-            log = discord.Embed(
-                title="<a:alert:1473532424095797308> __ผู้ใช้ทำผิดกฏเซิร์ฟเวอร์__ <a:alert:1473532424095797308>",
-                color=discord.Color.orange()
-            )
-
-            log.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
-            log.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
-            log.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__พิมพ์คำต้องห้าม/คำหยาบ__***", inline=False)
-            log.add_field(name=" ", value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
-
-            log.set_author(
-                name=message.author.name,
-                icon_url=message.author.display_avatar.url
-            )
-
-            log.set_thumbnail(
-                url=message.author.display_avatar.url
-            )
-
-            log.set_image(
-                url="https://i.postimg.cc/nh16Vmsb/standard.gif"
-            )
-
-            thai_time = message.created_at + timedelta(hours=7)
-
-            log.set_footer(
-                text=f"{message.guild.name} • {thai_time.strftime('%d/%m/%Y %H:%M')}",
-                icon_url=message.guild.icon.url if message.guild.icon else None
-            )
-
-            await log_channel.send(embed=log)
-
-        else:
-            await message.guild.ban(message.author, reason="ใช้คำต้องห้ามซ้ำ")
-
-        log_channel = bot.get_channel(LOG_CHANNEL_ID)
-
-        if log_channel:
-            ban_embed = discord.Embed(
-                title="<a:alert:1473532424095797308> __ผู้ใช้ถูกแบนถาวร__ 🔨",
-                color=discord.Color.red()
-            )
-
-            ban_embed.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
-            ban_embed.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
-            ban_embed.add_field(name=" ", value=f"**`👮 แบนโดย :`** {bot.user.mention}", inline=False)
-            ban_embed.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__พิมพ์คำต้องห้ามซ้ำ__***", inline=False)
-
-            ban_embed.set_author(
-                name=message.author.name,
-                icon_url=message.author.display_avatar.url
-            )
-
-            ban_embed.set_thumbnail(
-                url=message.author.display_avatar.url
-            )
-
-            ban_embed.set_image(
-                url="https://i.postimg.cc/xTwZ3RmN/standard-(1).gif"
-            )
-
-            thai_time = message.created_at + timedelta(hours=7)
-
-            ban_embed.set_footer(
-                text=f"{message.guild.name} • {thai_time.strftime('%d/%m/%Y %H:%M')}",
-                icon_url=message.guild.icon.url if message.guild.icon else None
-            )
-
-            await log_channel.send(embed=ban_embed)
+            return
 
         return
-
-# =========================
-#  ใช้ฟังก์ชันแทนของเดิม
-# =========================
+    # ========================================
+    #  LINK ระบบกันลิ้งก์ข้อความตอบกลับ + embed + ban
+    # ========================================
     if await contains_blocked_link(message):
 
         await message.delete()
@@ -371,7 +203,7 @@ async def on_message(message):
             link_warnings[user_id] = 1
 
             warn_embed = discord.Embed(
-                description="<a:warning2:1477146378491793529> คุณส่งลิงก์ที่ไม่ได้รับอนุญาต\n```ครั้งต่อไปคุณจะถูกแบนถาวร```",
+                description="<a:warning2:1477146378491793529> คุณส่งลิงก์ที่ไม่ได้รับอนุญาต\n```คุณถูก Timeout 24 ชั่วโมง\nหากทำผิดซ้ำจะถูกแบนถาวร```",
                 color=discord.Color.orange()
             )
 
@@ -379,6 +211,11 @@ async def on_message(message):
                 message.author.mention,
                 embed=warn_embed,
                 delete_after=5
+            )
+
+            await message.author.timeout(
+                timedelta(days=1),
+                reason="ส่งลิงก์ต้องห้าม"
             )
 
             if log_channel:
@@ -390,7 +227,9 @@ async def on_message(message):
                 log.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
                 log.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
                 log.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__ส่งลิงก์ต้องห้าม__***", inline=False)
-                log.add_field(name=" ", value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>", inline=False)
+                log.add_field(name=" ",
+                              value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>",
+                              inline=False)
 
                 log.set_author(
                     name=message.author.name,
@@ -459,14 +298,179 @@ async def on_message(message):
 
             return
 
+    # 👇 เริ่มกันสแปม
+
+    # =========================
+    # SPAM กันสแปมข้อความแพทเทิร์นเดิม
+    # =========================
+    user_id = message.author.id
+    content = message.content.strip().lower()
+
+    if user_id not in user_last_messages:
+        user_last_messages[user_id] = []
+
+    user_last_messages[user_id].append((content, message))
+
+    # เก็บแค่ 2 ล่าสุด
+    if len(user_last_messages[user_id]) > 2:
+        user_last_messages[user_id].pop(0)
+
+    # เช็คว่าทั้ง 2 เหมือนกันมั้ย
+    if len(user_last_messages[user_id]) == 2:
+        msgs = user_last_messages[user_id]
+
+        if all(m[0] == content for m in msgs):
+            for _, msg_obj in msgs:
+                try:
+                    await msg_obj.delete()
+                except discord.NotFound:
+                    pass
+                except discord.Forbidden:
+                    pass
+
+            user_last_messages[user_id] = []
+
+            await message.channel.send(
+                f"{message.author.mention}",
+                embed=discord.Embed(
+                    description="<a:warning2:1477146378491793529> คุณกระทำผิดกฎเซิร์ฟเวอร์\n```ห้ามสแปมข้อความซ้ำ 🚫```",
+                    color=discord.Color.orange()
+                ),
+                delete_after=5
+            )
+            return
+
+    # =========================
+    #  BADWORD ระบบกันคำหยาบหรือคำต้องห้าม
+    # =========================
+    def contains_bad_word(text):
+        if not text:
+            return False
+
+        text = text.lower()
+
+        for word in bad_words:
+            if word in text:
+                return True
+
+        return False
+
+    if contains_bad_word(message.content):
+
+        await message.delete()
+
+        user_id = message.author.id
+        log_channel = bot.get_channel(LOG_CHANNEL_ID)
+
+        # ========================
+        # ครั้งแรก = เตือน
+        # ========================
+        if user_id not in badword_warnings:
+
+            badword_warnings[user_id] = 1
+
+            warn_embed = discord.Embed(
+                description="<a:warning2:1477146378491793529> คุณกระทำผิดกฎเซิร์ฟเวอร์\n```พิมพ์คำต้องห้ามหรือคำหยาบ```",
+                color=discord.Color.orange()
+            )
+
+            await message.channel.send(
+                message.author.mention,
+                embed=warn_embed,
+                delete_after=5
+            )
+
+            if log_channel:
+                log = discord.Embed(
+                    title="<a:alert:1473532424095797308> __ผู้ใช้ทำผิดกฏเซิร์ฟเวอร์__ <a:alert:1473532424095797308>",
+                    color=discord.Color.orange()
+                )
+
+                log.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
+                log.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
+                log.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__พิมพ์คำต้องห้าม/คำหยาบ__***", inline=False)
+                log.add_field(name=" ",
+                              value=f"**`🔨 บทลงโทษ :`** ***__เตือนครั้งที่ 1__*** <a:1red:1475382252715380887>",
+                              inline=False)
+
+                log.set_author(
+                    name=message.author.name,
+                    icon_url=message.author.display_avatar.url
+                )
+
+                log.set_thumbnail(
+                    url=message.author.display_avatar.url
+                )
+
+                log.set_image(
+                    url="https://i.postimg.cc/nh16Vmsb/standard.gif"
+                )
+
+                thai_time = message.created_at + timedelta(hours=7)
+
+                log.set_footer(
+                    text=f"{message.guild.name} • {thai_time.strftime('%d/%m/%Y %H:%M')}",
+                    icon_url=message.guild.icon.url if message.guild.icon else None
+                )
+
+                await log_channel.send(embed=log)
+
+            return
+
+        # ========================
+        # ครั้งสอง = แบน
+        # ========================
+        else:
+
+            await message.guild.ban(
+                message.author,
+                reason="ใช้คำต้องห้ามซ้ำ"
+            )
+
+            if log_channel:
+                ban_embed = discord.Embed(
+                    title="<a:alert:1473532424095797308> __ผู้ใช้ถูกแบนถาวร__ 🔨",
+                    color=discord.Color.red()
+                )
+
+                ban_embed.add_field(name=" ", value=f"**`👤 ผู้ใช้ :`** {message.author.mention}", inline=False)
+                ban_embed.add_field(name=" ", value=f"**`🏷️ ห้อง :`** {message.channel.mention}", inline=False)
+                ban_embed.add_field(name=" ", value=f"**`👮 แบนโดย :`** {bot.user.mention}", inline=False)
+                ban_embed.add_field(name=" ", value=f"**`📜 เหตุผล :`** ***__พิมพ์คำต้องห้ามซ้ำ__***", inline=False)
+
+                ban_embed.set_author(
+                    name=message.author.name,
+                    icon_url=message.author.display_avatar.url
+                )
+
+                ban_embed.set_thumbnail(
+                    url=message.author.display_avatar.url
+                )
+
+                ban_embed.set_image(
+                    url="https://i.postimg.cc/xTwZ3RmN/standard-(1).gif"
+                )
+
+                thai_time = message.created_at + timedelta(hours=7)
+
+                ban_embed.set_footer(
+                    text=f"{message.guild.name} • {thai_time.strftime('%d/%m/%Y %H:%M')}",
+                    icon_url=message.guild.icon.url if message.guild.icon else None
+                )
+
+                await log_channel.send(embed=ban_embed)
+
+            return
+
     await bot.process_commands(message)
+
+
 # ========================
 # ระบบแบนโดยแอดมิน
 # ========================
 
 @bot.event
 async def on_member_ban(guild, user):
-
     log_channel = bot.get_channel(LOG_CHANNEL_ID)
 
     async for entry in guild.audit_logs(limit=1, action=discord.AuditLogAction.ban):
@@ -514,20 +518,20 @@ async def on_member_ban(guild, user):
 
         break
 
+
 # ========================
 # ระบบกันแก้ข้อตวามเป็นลิงก์
 # ========================
 
 @bot.event
 async def on_message_edit(_, after):
-
     if after.author.bot:
         return
 
     if any(role.id in WHITELIST_ROLE_IDS for role in after.author.roles):
         return
 
-    if contains_blocked_link(after):
+    if await contains_blocked_link(after):
         await after.delete()
 
         warn_embed = discord.Embed(
@@ -537,19 +541,19 @@ async def on_message_edit(_, after):
 
         await after.channel.send(after.author.mention, embed=warn_embed, delete_after=5)
 
+
 # ========================
 # ระบบนำ warning ออกจากผู้ใช้
 # ========================
 
 @bot.command()
 async def clearwarn(ctx, member: discord.Member):
-
     if ctx.author.id != OWNER_ID:
         return
 
     had_warning = (
-        member.id in link_warnings or
-        member.id in badword_warnings
+            member.id in link_warnings or
+            member.id in badword_warnings
     )
 
     # ลบ warning
@@ -570,10 +574,11 @@ async def clearwarn(ctx, member: discord.Member):
         )
 
     await ctx.send(embed=result_embed)
+
+
 # ============ เพิ่มคำต้องห้าม =============
 @bot.command()
 async def addword(ctx, *, word):
-
     if ctx.author.id != OWNER_ID:
         return
 
@@ -587,40 +592,41 @@ async def addword(ctx, *, word):
 
     await ctx.send(f"เพิ่มคำต้องห้าม: `{word}`")
 
+
 # ============ ลบคำต้องห้าม =============
 @bot.command()
 async def removeword(ctx, *, word):
+    if ctx.author.id != OWNER_ID:
+        return
 
-        if ctx.author.id != OWNER_ID:
-            return
+    bad_words.discard(word.lower())
 
-        bad_words.discard(word.lower())
+    await ctx.send(f"ลบคำต้องห้าม: `{word}`")
 
-        await ctx.send(f"ลบคำต้องห้าม: `{word}`")
 
 # ============ LIST คำต้องห้าม =============
 @bot.command()
 async def listword(ctx):
+    if ctx.author.id != OWNER_ID:
+        return
 
-        if ctx.author.id != OWNER_ID:
-            return
+    if not bad_words:
+        list_embed = discord.Embed(
+            title="📄 รายการคำต้องห้าม",
+            description="ยังไม่มีคำต้องห้าม",
+            color=discord.Color.blue()
+        )
+    else:
+        word_list = "\n".join(f"- {word}" for word in bad_words)
 
-        if not bad_words:
-            list_embed = discord.Embed(
-                title="📄 รายการคำต้องห้าม",
-                description="ยังไม่มีคำต้องห้าม",
-                color=discord.Color.blue()
-            )
-        else:
-            word_list = "\n".join(f"- {word}" for word in bad_words)
+        list_embed = discord.Embed(
+            title="📄 รายการคำต้องห้าม",
+            description=word_list,
+            color=discord.Color.orange()
+        )
 
-            list_embed = discord.Embed(
-                title="📄 รายการคำต้องห้าม",
-                description=word_list,
-                color=discord.Color.orange()
-            )
+    await ctx.send(embed=list_embed)
 
-        await ctx.send(embed=list_embed)
 
 # ================= RUN =================
 
