@@ -4,7 +4,6 @@ import re
 from discord.ext import commands
 from datetime import datetime, timedelta, timezone
 from myserver import server_on
-
 # ================= TOKEN =================
 # Token อยู่ใน render
 # ================= ID CHANNEL =================
@@ -27,8 +26,6 @@ user_last_messages = {}
 link_warnings = {}
 badword_warnings = {}
 bad_words = set()
-
-
 # ========================
 # ปุ่มรับยศ
 # ========================
@@ -60,15 +57,12 @@ class RoleButton(discord.ui.View):
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
 # ========================
 # บอทออนไลน์
 # ========================
 @bot.event
 async def on_ready():
     print(f"บอทออนไลน์ {bot.user}")
-
-
 # ========================
 # คำสั่งส่งปุ่มรับยศ
 # ========================
@@ -84,7 +78,6 @@ async def sendrole(ctx):
     )
 
     await ctx.send(embed=embed, view=RoleButton())
-
 
 # =========================
 # ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
@@ -559,6 +552,14 @@ async def clearwarn(ctx, member: discord.Member):
     # ลบ warning
     link_warnings.pop(member.id, None)
     badword_warnings.pop(member.id, None)
+
+    try:
+        await member.timeout(
+            None,
+            reason=f"ปลด Timeout โดย {ctx.author}"
+        )
+    except discord.Forbidden:
+        pass
 
     if had_warning:
         result_embed = discord.Embed(
