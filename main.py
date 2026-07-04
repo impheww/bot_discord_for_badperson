@@ -92,9 +92,19 @@ async def contains_blocked_link(msg):
         no_space = text.replace(" ", "")
 
         patterns = [
+            # Discord invite
             r"discord\s*\.?\s*gg/[a-zA-Z0-9]+",
             r"discord\s*\.?\s*com/invite/[a-zA-Z0-9]+",
             r"discordapp\s*\.?\s*com/invite/[a-zA-Z0-9]+"
+            
+            # URL Shorteners
+            r"(?:https?:\/\/)?(?:www\.)?bit\.ly\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?tinyurl\.com\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?is\.gd\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?cutt\.ly\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?t\.co\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?goo\.gl\/\S+",
+            r"(?:https?:\/\/)?(?:www\.)?shorturl\.at\/\S+",
         ]
 
         for p in patterns:
