@@ -9,16 +9,16 @@ from myserver import server_on
 # ================= ID CHANNEL =================
 DOT_CHANNEL_ID = 1470997086068805715  # ห้องจุดเช็คยศ
 LOG_CHANNEL_ID = 1480097222614974535  # ห้อง embed เตือน/แบน
+BOOST_CHANNEL_ID = 1056462494467633192  # ห้อง Boost ที่ไม่ให้บอทตรวจข้อความ
 # ================= ID ROLE =================
 ROLE_ID = 1479026080944885780  # ยศปุ่มรับยศ
 WHITELIST_ROLE_IDS = [1474002697077264424, 1470443370538074214, 1049290191778623549,
                       1474034129841553450]  # ยศที่อนุญาตให้ส่งลิงก์ได้ (เช่น Admin/Mod)
 OWNER_ID = 848068744303083551
-
+# ============= INTENTS ================
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # เก็บจำนวนครั้งที่เตือน
@@ -56,7 +56,6 @@ class RoleButton(discord.ui.View):
             )
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
-
 # ========================
 # บอทออนไลน์
 # ========================
@@ -76,13 +75,11 @@ async def sendrole(ctx):
         description="```กดปุ่มอีโมจิ 🔞 ด้านล่างเพื่อรับยศ```",
         color=discord.Color.purple()
     )
-
     await ctx.send(embed=embed, view=RoleButton())
 
 # =========================
 # ฟังก์ชันตรวจลิงก์ (รองรับ forward + embed)
 # =========================
-
 async def contains_blocked_link(msg):
     def check_text(text):
         if not text:
@@ -96,7 +93,7 @@ async def contains_blocked_link(msg):
             r"discord\s*\.?\s*gg/[a-zA-Z0-9]+",
             r"discord\s*\.?\s*com/invite/[a-zA-Z0-9]+",
             r"discordapp\s*\.?\s*com/invite/[a-zA-Z0-9]+",
-            
+
             # URL Shorteners
             r"(?:https?:\/\/)?(?:www\.)?bit\.ly\/\S+",
             r"(?:https?:\/\/)?(?:www\.)?tinyurl\.com\/\S+",
@@ -144,13 +141,17 @@ async def contains_blocked_link(msg):
 
     return False
 
-
 # ========================
 # on_message ระบบกันลิงก์ + สแปม + คำต้องห้าม
 # ========================
 @bot.event
 async def on_message(message):
     if message.author.bot:
+        return
+
+    # ห้อง Boost: ไม่ให้บอทตรวจข้อความใด ๆ
+    if message.channel.id == BOOST_CHANNEL_ID:
+        await bot.process_commands(message)
         return
 
     if message.author.guild_permissions.administrator:
@@ -466,8 +467,6 @@ async def on_message(message):
             return
 
     await bot.process_commands(message)
-
-
 # ========================
 # ระบบแบนโดยแอดมิน
 # ========================
@@ -520,20 +519,20 @@ async def on_member_ban(guild, user):
             await log_channel.send(embed=ban_embed)
 
         break
-
-
 # ========================
 # ระบบกันแก้ข้อตวามเป็นลิงก์
 # ========================
-
 @bot.event
 async def on_message_edit(_, after):
     if after.author.bot:
         return
 
-    if any(role.id in WHITELIST_ROLE_IDS for role in after.author.roles):
+    # ห้อง Boost: ไม่ตรวจข้อความที่ถูกแก้ไขด้วย
+    if after.channel.id == BOOST_CHANNEL_ID:
         return
 
+    if any(role.id in WHITELIST_ROLE_IDS for role in after.author.roles):
+        return
     if await contains_blocked_link(after):
         await after.delete()
 
@@ -543,12 +542,9 @@ async def on_message_edit(_, after):
         )
 
         await after.channel.send(after.author.mention, embed=warn_embed, delete_after=5)
-
-
 # ========================
 # ระบบนำ warning ออกจากผู้ใช้
 # ========================
-
 @bot.command()
 async def clearwarn(ctx, member: discord.Member):
     if ctx.author.id != OWNER_ID:
@@ -585,8 +581,6 @@ async def clearwarn(ctx, member: discord.Member):
         )
 
     await ctx.send(embed=result_embed)
-
-
 # ============ เพิ่มคำต้องห้าม =============
 @bot.command()
 async def addword(ctx, *, word):
@@ -602,8 +596,6 @@ async def addword(ctx, *, word):
     bad_words.add(word)
 
     await ctx.send(f"เพิ่มคำต้องห้าม: `{word}`")
-
-
 # ============ ลบคำต้องห้าม =============
 @bot.command()
 async def removeword(ctx, *, word):
@@ -613,8 +605,6 @@ async def removeword(ctx, *, word):
     bad_words.discard(word.lower())
 
     await ctx.send(f"ลบคำต้องห้าม: `{word}`")
-
-
 # ============ LIST คำต้องห้าม =============
 @bot.command()
 async def listword(ctx):
@@ -637,8 +627,6 @@ async def listword(ctx):
         )
 
     await ctx.send(embed=list_embed)
-
-
 # ================= RUN =================
 
 server_on()
