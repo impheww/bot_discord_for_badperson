@@ -95,7 +95,7 @@ async def contains_blocked_link(msg):
             # Discord invite
             r"discord\s*\.?\s*gg/[a-zA-Z0-9]+",
             r"discord\s*\.?\s*com/invite/[a-zA-Z0-9]+",
-            r"discordapp\s*\.?\s*com/invite/[a-zA-Z0-9]+"
+            r"discordapp\s*\.?\s*com/invite/[a-zA-Z0-9]+",
             
             # URL Shorteners
             r"(?:https?:\/\/)?(?:www\.)?bit\.ly\/\S+",
